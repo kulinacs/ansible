@@ -443,6 +443,7 @@ def main():
 
         if env:
             if not os.path.exists(os.path.join(env, 'bin', 'activate')):
+                venv_created = True
                 if module.check_mode:
                     module.exit_json(changed=True)
 
@@ -474,6 +475,10 @@ def main():
                 err += err_venv
                 if rc != 0:
                     _fail(module, cmd, out, err)
+            else:
+                venv_created = False
+        else:
+            venv_created = False
 
         pip = _get_pip(module, env, module.params['executable'])
 
@@ -564,17 +569,20 @@ def main():
         elif rc != 0:
             _fail(module, cmd, out, err)
 
-        if state == 'absent':
-            changed = 'Successfully uninstalled' in out_pip
+        if venv_created:
+            changed = True
         else:
-            if out_freeze_before is None:
-                changed = 'Successfully installed' in out_pip
+            if state == 'absent':
+                changed = 'Successfully uninstalled' in out_pip
             else:
                 if out_freeze_before is None:
                     changed = 'Successfully installed' in out_pip
                 else:
-                    _, out_freeze_after, _ = _get_packages(module, pip, chdir)
-                    changed = out_freeze_before != out_freeze_after
+                    if out_freeze_before is None:
+                        changed = 'Successfully installed' in out_pip
+                    else:
+                        _, out_freeze_after, _ = _get_packages(module, pip, chdir)
+                        changed = out_freeze_before != out_freeze_after
 
         module.exit_json(changed=changed, cmd=cmd, name=name, version=version,
                          state=state, requirements=requirements, virtualenv=env,
